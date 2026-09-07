@@ -15,14 +15,14 @@ from wiemip_registry.core import Model
 
 adapters = {
     "BEPS": BEPS(),
-    "BiomeE": BiomeE(),
+    # "BiomeE": BiomeE(),
     "CLASSIC": CLASSIC(),
     "CLM": CLM(),
     "CLM_FATES": CLM_FATES(),
     "DLEM": DLEM(),
     "JSBACH": JSBACH(),
     "JULES": JULES(),
-    "LPJ_EOSIM": LPJ_EOSIM(),
+    # "LPJ_EOSIM": LPJ_EOSIM(),
     "LPJmL6": LPJmL6(),
     "LPX_Bern": LPX_Bern(),
     "VISIT_UT": VISIT_UT(),
