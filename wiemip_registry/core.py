@@ -415,6 +415,41 @@ def _csv_path(src: Path, start: float | None, end: float | None) -> Path:
     return const.CSV_ROOT / rel.parent / f"{rel.stem}_{band}.csv"
 
 
+def _pin_time_us(index: pd.Index) -> pd.Index:
+    """Re-pin a CSV-read index's time level to `datetime64[us]`.
+
+    read_csv picks a resolution per file, so a series that stops before 2262 comes
+    back in ns and one running to 2300 in us; adding the two then overflows. Pin
+    both to what standardize() hands out. Only the level actually named 'time' is
+    a date — a `pft`/`pool`/`level` level is left alone.
+    """
+    if isinstance(index, pd.MultiIndex):
+        if "time" not in index.names:
+            return index
+        i = index.names.index("time")
+        return index.set_levels(
+            pd.to_datetime(index.levels[i]).astype("datetime64[us]"), level=i
+        )
+    return pd.to_datetime(index).astype("datetime64[us]")
+
+
+def _read_cached(out: Path) -> pd.Series:
+    """Read back what `pd.Series.to_csv` wrote, for a flat OR MultiIndex series.
+
+    `to_csv` writes one column per index level followed by the value column, so the
+    values are the LAST column and everything before it is index. Reading a fixed
+    `index_col=0` instead silently returned the second index level as the data for
+    every variable that keeps a dim beyond (lat, lon) — the per-PFT pools on every
+    model, CLM's `pool`-stacked `cSoilPools`/`rhPools`, the `*Layers` variables.
+    That surfaced as strings (a PFT code) or, worse, as plausible floats (a year).
+    """
+    frame = pd.read_csv(out)
+    *levels, value = frame.columns
+    series = frame.set_index(levels)[value] if levels else frame[value]
+    series.index = _pin_time_us(series.index)
+    return series
+
+
 def cache_csv(method):
     """Lazy CSV cache for a `WIEFile` (lat, lon)->time aggregation returning a
     `pd.Series`. Mirrors the result to a CSV under `const.CSV_ROOT` and recomputes
@@ -434,12 +469,7 @@ def cache_csv(method):
             and all(src.exists() for src in srcs)
             and out.stat().st_mtime >= max(src.stat().st_mtime for src in srcs)
         ):
-            series = pd.read_csv(out, index_col=0, parse_dates=True).iloc[:, 0]
-            # read_csv picks a resolution per file, so a series that stops before 2262
-            # comes back in ns and one running to 2300 in us; adding the two then
-            # overflows. Pin both to what standardize() hands out.
-            series.index = series.index.astype("datetime64[us]")
-            return series
+            return _read_cached(out)
         series = method(self, start, end)
         out.parent.mkdir(parents=True, exist_ok=True)
         series.to_csv(out)

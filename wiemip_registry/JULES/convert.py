@@ -67,7 +67,8 @@ class JULES(core.WIEAdapter):
     FACTORIALS = _FACTORIALS
     OVERSHOOT_FACTORIALS = _OVERSHOOT_CONFIGS
 
-    ANNUAL = {"fFireCveg", "fFireCsoil"}
+    ANNUAL = {"fFireCveg", "fFireCsoil", "fFirepft"}
+    MONTHLY = {"wetfrac"}
 
     wiemip_to_jules_variable_mapping = {
         "fFireCveg": "fVegFire",
@@ -80,7 +81,8 @@ class JULES(core.WIEAdapter):
         )
 
     def _cadence(self, variable: str) -> str:
-        """Cadence token, keyed on the registry name (as is const.ANNUAL)."""
+        if variable in self.MONTHLY:
+            return "mon"
         return "yr" if variable in self.ANNUAL or core.is_annual(variable) else "mon"
 
     def land_carbon_variables(self) -> list[str]:
